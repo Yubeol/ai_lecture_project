@@ -37,7 +37,7 @@ class SimilarityGauge(Base):
 class VectorBars(Base):
     component: Literal["VectorBars"]
     title: str = Field(min_length=1, max_length=40)
-    sentences: List[str] = Field(min_length=2, max_length=4)
+    sentences: List[str] = Field(min_length=4, max_length=6)
     dims: int = Field(default=16, ge=8, le=64)
     caption: str = Field(min_length=1, max_length=120)
 

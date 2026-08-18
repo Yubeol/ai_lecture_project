@@ -1,9 +1,11 @@
 import SimilarityGauge from './slides/SimilarityGauge'
 import VectorBars from './slides/VectorBars'
+import Scatter2D from './slides/Scatter2D'
 
 const REGISTRY = {
   SimilarityGauge,
   VectorBars,
+  Scatter2D,
 }
 
 export default function Stage({ payload }) {
@@ -28,8 +30,8 @@ export default function Stage({ payload }) {
     )
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center">
+    return (
+    <div className="min-h-screen flex items-start justify-center pt-12 pb-48">
       <Component {...payload} />
     </div>
   )

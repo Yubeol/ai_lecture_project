@@ -53,7 +53,7 @@ class VectorBars(Base):
 class Scatter2D(Base):
     component: Literal["Scatter2D"]
     title: str = Field(min_length=1, max_length=40)
-    sentences: List[str] = Field(min_length=3, max_length=8)
+    sentences: List[str] = Field(min_length=4, max_length=6)
     caption: str = Field(min_length=1, max_length=120)
 
     @field_validator("sentences")
