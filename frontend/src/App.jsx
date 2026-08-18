@@ -1,19 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import Stage from './components/Stage'
-import { generate } from './api/client'
+import { generate, prefetchNext, prefetchFirst } from './api/prefetch'
 import useSpeech from './hooks/useSpeech'
+import scenarioOrder from './fixtures/scenarioOrder.json'
 
-const PRESETS = [
-  '오늘은 임베딩이라는 걸 다뤄보겠습니다',
-  '컴퓨터는 글자를 그대로 이해하지 못해서 문장을 숫자로 바꿔야 합니다',
-  '이 숫자들이 각각 무슨 뜻인지는 사람이 알 수 없습니다',
-  '이 숫자로 두 문장이 얼마나 비슷한지 잴 수 있습니다',
-  '표현이 완전히 달라도 의미가 같으면 가까운 걸로 판단해요',
-  '반대로 아무 상관 없는 문장이면 점수가 확 떨어지겠죠',
-  '여기까지 질문 있으신가요',
-  '이걸 평면에 찍어보면 비슷한 문장끼리 모여 있는 게 보입니다',
-  '지금 이 강의 화면도 임베딩으로 만들어지고 있습니다',
-]
+const PRESETS = scenarioOrder
 
 export default function App() {
   const [payload, setPayload] = useState(null)
@@ -23,12 +14,16 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [log, setLog] = useState(null)
 
+  // 앱이 뜨자마자 첫 발화를 미리 만들어 둔다
+  useEffect(() => { prefetchFirst() }, [])
+
   const send = useCallback(async (utterance) => {
     if (!utterance?.trim()) return
     setLoading(true)
     setLog(null)
     try {
       const res = await generate(utterance)
+
       if (res.ok) {
         setPayload(res.payload)
         setHistory((h) => {
@@ -36,14 +31,19 @@ export default function App() {
           setCursor(next.length - 1)
           return next
         })
-                setLog(
-          res.cached
-            ? `${res.payload.component} · cached (생성 실패 → 사전 생성분)`
-            : `${res.payload.component} · LLM ${res.timing.llm}s · embed ${res.timing.embed}s`
+        const name = res.payload.component
+        setLog(
+          res.prefetched ? `${name} · 선행 생성 (0.0s)`
+          : res.cached   ? `${name} · cached (생성 실패 → 사전 생성분)`
+          : `${name} · LLM ${res.timing.llm}s · embed ${res.timing.embed}s`
         )
       } else {
         setLog(`skip: ${res.reason}`)
       }
+
+      // 화면을 띄운 직후 다음 발화를 백그라운드에서 준비한다.
+      // 강사가 한 화면에서 말하는 동안 생성이 끝난다.
+      prefetchNext(utterance)
     } catch (e) {
       setLog(`error: ${e.message}`)
     } finally {
@@ -128,7 +128,7 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {PRESETS.map((p) => (
+            {PRESETS.map((p, i) => (
               <button
                 key={p}
                 onClick={() => send(p)}
@@ -136,7 +136,8 @@ export default function App() {
                 className="px-3 py-1 text-sm rounded bg-slate-800 hover:bg-slate-700
                            text-slate-300 disabled:opacity-40"
               >
-                {p.slice(0, 22)}...
+                <span className="text-slate-500 mr-1">{i + 1}</span>
+                {p.slice(0, 20)}...
               </button>
             ))}
           </div>
@@ -145,9 +146,7 @@ export default function App() {
             {log && <span>{log}</span>}
             {error && <span className="text-rose-400">{error}</span>}
             {history.length > 0 && (
-              <span className="ml-auto">
-                ← → {cursor + 1}/{history.length}
-              </span>
+              <span className="ml-auto">← → {cursor + 1}/{history.length}</span>
             )}
           </div>
         </div>
