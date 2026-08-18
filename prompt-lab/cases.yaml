@@ -1,0 +1,98 @@
+# 프롬프트 회귀 테스트 케이스
+# expect        : 기대 컴포넌트
+# must_contrast : pairs가 유사/무관 대비 구조인지 검사
+# forbid_numbers: 숫자 필드를 지어내지 않았는지 검사
+
+cases:
+  - id: sim_01
+    utterance: "비슷한 문장끼리는 점수가 높게 나옵니다. 예를 들어볼게요"
+    expect: SimilarityGauge
+    must_contrast: true
+
+  - id: sim_02
+    utterance: "표현이 완전히 달라도 의미가 같으면 가까운 걸로 판단해요"
+    expect: SimilarityGauge
+    must_contrast: true
+
+  - id: sim_03
+    utterance: "반대로 아무 상관 없는 문장이면 점수가 확 떨어지겠죠"
+    expect: SimilarityGauge
+    must_contrast: true
+
+  - id: sim_04
+    utterance: "코사인 유사도라는 걸로 두 문장이 얼마나 닮았는지를 잽니다"
+    expect: SimilarityGauge
+
+  - id: vec_01
+    utterance: "문장이 들어가면 768개의 숫자로 바뀝니다"
+    expect: VectorBars
+
+  - id: vec_02
+    utterance: "이 숫자들을 벡터라고 부르는데 앞쪽 몇 개만 한번 보죠"
+    expect: VectorBars
+
+  - id: vec_03
+    utterance: "각 차원이 무슨 뜻인지는 사람이 알 수 없어요. 그냥 숫자입니다"
+    expect: VectorBars
+
+  - id: sca_01
+    utterance: "이걸 평면에 찍어보면 비슷한 문장끼리 모여 있는 게 보입니다"
+    expect: Scatter2D
+
+  - id: sca_02
+    utterance: "의미 공간에서는 관련 있는 것들이 가까이 위치해요"
+    expect: Scatter2D
+
+  - id: thr_01
+    utterance: "그럼 몇 점부터 같은 의미라고 봐야 할까요"
+    expect: ThresholdSim
+
+  - id: thr_02
+    utterance: "기준값을 0.7로 잡으면 이렇게 갈리고 0.5로 낮추면 달라집니다"
+    expect: ThresholdSim
+
+  - id: non_01
+    utterance: "네 안녕하세요 오늘 강의 시작하겠습니다"
+    expect: none
+
+  - id: non_02
+    utterance: "여기까지 질문 있으신가요"
+    expect: none
+
+  - id: non_03
+    utterance: "잠시만요 화면이 좀 안 보이네요"
+    expect: none
+
+  - id: non_04
+    utterance: "자 그럼 다음으로 넘어가서"
+    expect: none
+
+  - id: non_05
+    utterance: "어 그 그러니까 이제"
+    expect: none
+
+  - id: non_06
+    utterance: "임베딩이 아니라 임 베팅 아 잠깐만"
+    expect: none
+
+  - id: non_07
+    utterance: "그"
+    expect: none
+
+  - id: trap_01
+    utterance: "이 두 문장은 0.87 정도 나올 거예요"
+    expect: none
+    forbid_numbers: true
+
+  - id: trap_02
+    utterance: "유사도가 대략 얼마쯤 나오는지 보여드릴게요"
+    expect: none
+    forbid_numbers: true
+
+  - id: edge_01
+    utterance: "임베딩은 텍스트를 벡터로 바꾸는 기술입니다"
+    expect: VectorBars
+
+  - id: edge_02
+    utterance: "오늘은 임베딩에 대해 이야기해보겠습니다"
+    expect: none

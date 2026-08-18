@@ -1,0 +1,25 @@
+# --- API ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+websockets==14.1
+pydantic==2.10.3
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+
+# --- LLM ---
+anthropic==0.40.0
+
+# --- 임베딩 ---
+sentence-transformers==3.3.1
+torch>=2.6.0
+numpy==1.26.4
+scikit-learn==1.6.0
+
+# --- prompt-lab ---
+PyYAML==6.0.2
+rich==13.9.4
+
+# --- DB (3일차 이후) ---
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3
+pgvector==0.3.6

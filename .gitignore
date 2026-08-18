@@ -1,0 +1,48 @@
+# ===== 환경변수 (최우선) =====
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ===== IDE =====
+.idea/
+*.iml
+.vscode/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== Node =====
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== 모델 캐시 =====
+.cache/
+models/
+*.safetensors
+*.bin
+
+# ===== prompt-lab 결과 =====
+prompt-lab/results/*.json
+prompt-lab/results/*.md
+!prompt-lab/results/.gitkeep
+
+# ===== 기타 =====
+*.log
+.DS_Store
+Thumbs.db
