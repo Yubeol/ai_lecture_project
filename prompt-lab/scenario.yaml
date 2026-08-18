@@ -1,0 +1,43 @@
+# 10분 강의 데모 시나리오.
+# 발표에서 실제로 말할 발화를 순서대로 적는다.
+# expect 는 기대 컴포넌트 (검증용).
+
+scenario:
+  - id: s01
+    utterance: "오늘은 임베딩이라는 걸 다뤄보겠습니다"
+    expect: none
+    note: "도입. 아직 보여줄 게 없다"
+
+  - id: s02
+    utterance: "컴퓨터는 글자를 그대로 이해하지 못해서 문장을 숫자로 바꿔야 합니다"
+    expect: VectorBars
+
+  - id: s03
+    utterance: "이 숫자들이 각각 무슨 뜻인지는 사람이 알 수 없습니다"
+    expect: VectorBars
+
+  - id: s04
+    utterance: "이 숫자로 두 문장이 얼마나 비슷한지 잴 수 있습니다"
+    expect: SimilarityGauge
+
+  - id: s05
+    utterance: "표현이 완전히 달라도 의미가 같으면 가까운 걸로 판단해요"
+    expect: SimilarityGauge
+
+  - id: s06
+    utterance: "반대로 아무 상관 없는 문장이면 점수가 확 떨어지겠죠"
+    expect: SimilarityGauge
+
+  - id: s07
+    utterance: "여기까지 질문 있으신가요"
+    expect: none
+    note: "잡담 방어 시연. 화면이 안 바뀌는 게 정상"
+
+  - id: s08
+    utterance: "이걸 평면에 찍어보면 비슷한 문장끼리 모여 있는 게 보입니다"
+    expect: Scatter2D
+
+  - id: s09
+    utterance: "지금 이 강의 화면도 임베딩으로 만들어지고 있습니다"
+    expect: none
+    note: "마무리. 자기 참조"

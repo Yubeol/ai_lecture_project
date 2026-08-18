@@ -4,10 +4,15 @@ import { generate } from './api/client'
 import useSpeech from './hooks/useSpeech'
 
 const PRESETS = [
-  '비슷한 문장끼리는 점수가 높게 나옵니다. 예를 들어볼게요',
-  '문장이 들어가면 768개의 숫자로 바뀝니다',
+  '오늘은 임베딩이라는 걸 다뤄보겠습니다',
+  '컴퓨터는 글자를 그대로 이해하지 못해서 문장을 숫자로 바꿔야 합니다',
+  '이 숫자들이 각각 무슨 뜻인지는 사람이 알 수 없습니다',
+  '이 숫자로 두 문장이 얼마나 비슷한지 잴 수 있습니다',
+  '표현이 완전히 달라도 의미가 같으면 가까운 걸로 판단해요',
+  '반대로 아무 상관 없는 문장이면 점수가 확 떨어지겠죠',
+  '여기까지 질문 있으신가요',
   '이걸 평면에 찍어보면 비슷한 문장끼리 모여 있는 게 보입니다',
-  '네 안녕하세요 오늘 강의 시작하겠습니다',
+  '지금 이 강의 화면도 임베딩으로 만들어지고 있습니다',
 ]
 
 export default function App() {
@@ -31,7 +36,11 @@ export default function App() {
           setCursor(next.length - 1)
           return next
         })
-        setLog(`${res.payload.component} · LLM ${res.timing.llm}s · embed ${res.timing.embed}s`)
+                setLog(
+          res.cached
+            ? `${res.payload.component} · cached (생성 실패 → 사전 생성분)`
+            : `${res.payload.component} · LLM ${res.timing.llm}s · embed ${res.timing.embed}s`
+        )
       } else {
         setLog(`skip: ${res.reason}`)
       }
