@@ -2,11 +2,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import SimilarityGauge from './slides/SimilarityGauge'
 import VectorBars from './slides/VectorBars'
 import Scatter2D from './slides/Scatter2D'
+import KeyPoints from './slides/KeyPoints'
 
 const REGISTRY = {
   SimilarityGauge,
   VectorBars,
   Scatter2D,
+  KeyPoints,
 }
 
 /** 화면이 교체될 때마다 새 key를 만든다. 같은 컴포넌트라도 내용이 바뀌면 다시 그린다. */

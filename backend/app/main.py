@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import embed, generate
+from app.routers import embed, generate, match
 from app.services import embedder
 
 logging.basicConfig(
@@ -27,6 +27,7 @@ app.add_middleware(
 
 app.include_router(embed.router)
 app.include_router(generate.router)
+app.include_router(match.router)
 
 
 @app.on_event("startup")

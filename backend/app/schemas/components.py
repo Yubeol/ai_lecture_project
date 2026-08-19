@@ -82,6 +82,27 @@ class ThresholdSim(Base):
             _check_sentence(p[1])
         return v
 
+class KeyPoints(Base):
+    """개념 설명용. 도입·정의·요약 구간에 쓴다.
+    수치가 없으므로 embedder를 거치지 않는다."""
+    component: Literal["KeyPoints"]
+    title: str = Field(min_length=1, max_length=40)
+    points: List[str] = Field(min_length=2, max_length=4)
+    caption: str = Field(default="", max_length=120)
+
+    @field_validator("points")
+    @classmethod
+    def v_points(cls, v):
+        cleaned = []
+        for s in v:
+            s = s.strip()
+            if not (4 <= len(s) <= 50):
+                raise ValueError(f"항목 길이 이상({len(s)}자): {s!r}")
+            cleaned.append(s)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("중복 항목")
+        return cleaned
+
 
 class NoOp(Base):
     """생성할 게 없을 때. 잡담/오인식 방어용."""
@@ -94,9 +115,9 @@ REGISTRY = {
     "VectorBars": VectorBars,
     "Scatter2D": Scatter2D,
     "ThresholdSim": ThresholdSim,
+    "KeyPoints": KeyPoints,
     "none": NoOp,
 }
-
 
 def validate_payload(obj) -> tuple[bool, str, str | None]:
     """(성공여부, 메시지, 컴포넌트명)"""
