@@ -118,3 +118,27 @@ export async function checkAmbiguity(script) {
     return null
   }
 }
+
+/** Scatter2D 세션 시작. PCA 축을 서버에 고정한다. */
+export async function scatterInit(sessionId, sentences) {
+  const res = await fetch('/api/scatter/init', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, sentences }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const json = await res.json()
+  return json.data
+}
+
+/** 고정된 축에 점 하나를 추가한다. 기존 점은 움직이지 않는다. */
+export async function scatterAdd(sessionId, sentence) {
+  const res = await fetch('/api/scatter/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, sentence }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const json = await res.json()
+  return json.data
+}

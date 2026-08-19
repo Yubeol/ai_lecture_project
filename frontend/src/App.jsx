@@ -1,14 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Mic, MicOff, Loader2, Send } from 'lucide-react'
+import { Mic, MicOff, Loader2, Send, Users } from 'lucide-react'
 import Intro from './components/Intro'
 import ScriptEditor from './components/ScriptEditor'
 import Header from './components/Header'
 import Stage from './components/Stage'
 import {
   generate, prefetchNext, prefetchFirst, matchScript, setScriptOrder,
+  scatterInit, scatterAdd,
 } from './api/prefetch'
 import useSpeech from './hooks/useSpeech'
 import { DEFAULT_SCRIPT } from './lib/script'
+
+// 청중 참여 구간에 미리 깔아둘 문장. 주제를 3가지로 나눠 축을 넓게 잡는다.
+const LIVE_SEED = [
+  '강아지가 마당에서 뛰어논다',
+  '고양이가 창가에서 낮잠을 잔다',
+  '김치찌개를 뚝배기에 끓였다',
+  '된장국에 두부를 넣었다',
+  '지하철이 역에 들어오고 있다',
+  '버스가 정류장에 도착했다',
+]
 
 export default function App() {
   const [view, setView] = useState('intro')   // intro | editor | lecture
@@ -22,11 +33,33 @@ export default function App() {
   const [log, setLog] = useState(null)
   const [panelOpen, setPanelOpen] = useState(true)
   const [matchInfo, setMatchInfo] = useState(null)
+  const [liveMode, setLiveMode] = useState(false)
 
   const started = view === 'lecture'
 
+  // 청중이 말한 문장을 기존 축에 투영해 점으로 추가한다.
+  const addPoint = useCallback(async (sentence) => {
+    if (!sentence?.trim()) return
+    setLoading(true)
+    try {
+      const point = await scatterAdd('live', sentence.trim())
+      setPayload((p) => ({ ...p, data: [...p.data, point] }))
+      setLog(`추가됨 · 가장 가까운 문장과 ${point.nearest_score}`)
+    } catch (e) {
+      setLog(`error: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   const send = useCallback(async (utterance, opts = {}) => {
     if (!utterance?.trim()) return
+
+    // 청중 참여 중이면 발화를 점으로 추가한다
+    if (liveMode && !opts.exact) {
+      await addPoint(utterance)
+      return
+    }
 
     setLoading(true)
     setLog(null)
@@ -76,7 +109,27 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [mode, script])
+  }, [mode, script, liveMode, addPoint])
+
+  // 청중 참여 구간 시작. PCA 축을 서버에 고정하고 Live 산점도로 전환한다.
+  const startLive = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await scatterInit('live', LIVE_SEED)
+      setPayload({
+        component: 'Scatter2DLive',
+        title: '여러분의 문장은 어디에 놓일까요',
+        caption: '문장을 말하면 이 평면 위에 점이 찍힙니다',
+        data,
+      })
+      setLiveMode(true)
+      setLog('청중 참여 모드 · 문장을 입력하면 점이 추가됩니다')
+    } catch (e) {
+      setLog(`error: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   const { listening, interim, error, start, stop, supported } = useSpeech({
     onFinal: send,
@@ -102,6 +155,7 @@ export default function App() {
     setText('')
     setLog(null)
     setMatchInfo(null)
+    setLiveMode(false)
   }, [stop])
 
   // 방향키 수동 조작. 자동 생성이 실패해도 강의는 계속되어야 한다.
@@ -237,31 +291,48 @@ export default function App() {
               )}
             </button>
 
+            <button
+              onClick={liveMode ? () => setLiveMode(false) : startLive}
+              className={`px-4 py-2 rounded font-medium ${
+                liveMode
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Users size={17} /> {liveMode ? '참여 종료' : '청중 참여'}
+              </span>
+            </button>
+
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && send(text)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { send(text); setText('') }
+              }}
               placeholder={
-                mode === 'script'
-                  ? '대본 문장을 말하듯 입력하세요'
-                  : '아무 발화나 입력하세요'
+                liveMode
+                  ? '문장을 입력하면 점이 추가됩니다'
+                  : mode === 'script'
+                    ? '대본 문장을 말하듯 입력하세요'
+                    : '아무 발화나 입력하세요'
               }
               className="flex-1 px-4 py-2 rounded bg-slate-800 text-slate-100
                          border border-slate-700 outline-none focus:border-slate-500"
             />
             <button
-              onClick={() => send(text)}
+              onClick={() => { send(text); setText('') }}
               disabled={loading}
               className="px-6 py-2 rounded bg-emerald-600 hover:bg-emerald-500
                          disabled:opacity-40 text-white font-medium"
             >
               <span className="flex items-center gap-2">
-                <Send size={16} /> 생성
+                <Send size={16} /> {liveMode ? '추가' : '생성'}
               </span>
             </button>
           </div>
 
-          {mode === 'script' && (
+          {mode === 'script' && !liveMode && (
             <div className="flex flex-wrap gap-2">
               {script.utterances.map((p, i) => (
                 <button

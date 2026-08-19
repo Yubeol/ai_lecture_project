@@ -101,3 +101,68 @@ def threshold_pairs(pairs: list[list[str]]) -> list[dict]:
     """ThresholdSim용. 구조는 similarity_pairs와 같지만
     프론트에서 슬라이더로 판정선을 움직인다."""
     return similarity_pairs(pairs)
+
+# ---------- Scatter2D 세션 ----------
+# 점을 나중에 추가하려면 PCA 축이 고정되어야 한다.
+# t-SNE가 아니라 PCA를 고른 이유가 이것이다: fit 한 번, transform 여러 번.
+
+_scatter_sessions: dict[str, dict] = {}
+
+
+def scatter_init(session_id: str, sentences: list[str]) -> list[dict]:
+    """첫 문장 세트로 PCA를 학습하고 좌표를 만든다. 축을 세션에 보관한다."""
+    if len(sentences) < 3:
+        raise ValueError("Scatter2D는 문장 3개 이상 필요")
+
+    vecs = encode(sentences)
+    pca = PCA(n_components=2, random_state=42).fit(vecs)
+    coords = pca.transform(vecs)
+
+    span = float(np.abs(coords).max()) or 1.0
+
+    _scatter_sessions[session_id] = {
+        "pca": pca,
+        "span": span,
+        "sentences": list(sentences),
+    }
+
+    return [
+        {"sentence": s, "x": round(float(c[0] / span), 4),
+         "y": round(float(c[1] / span), 4), "added": False}
+        for s, c in zip(sentences, coords)
+    ]
+
+
+def scatter_add(session_id: str, sentence: str) -> dict:
+    """기존 축 그대로 새 문장 하나를 투영한다. 기존 점은 움직이지 않는다."""
+    sess = _scatter_sessions.get(session_id)
+    if sess is None:
+        raise KeyError("세션 없음. 먼저 scatter_init 을 호출해야 한다")
+
+    vec = encode([sentence])
+    c = sess["pca"].transform(vec)[0]
+    span = sess["span"]
+
+    # 새 점이 축 범위를 벗어나면 화면 밖으로 나간다. 가장자리에 붙여 둔다.
+    x = max(-1.0, min(1.0, float(c[0] / span)))
+    y = max(-1.0, min(1.0, float(c[1] / span)))
+
+    sess["sentences"].append(sentence)
+
+    # 가장 가까운 기존 문장도 함께 알려준다. "어디에 붙었는지"를 말할 수 있게.
+    all_vecs = encode(sess["sentences"][:-1])
+    sims = [float(np.dot(vec[0], v)) for v in all_vecs]
+    best = int(np.argmax(sims))
+
+    return {
+        "sentence": sentence,
+        "x": round(x, 4),
+        "y": round(y, 4),
+        "added": True,
+        "nearest": sess["sentences"][best],
+        "nearest_score": round(sims[best], 4),
+    }
+
+
+def scatter_clear(session_id: str) -> None:
+    _scatter_sessions.pop(session_id, None)

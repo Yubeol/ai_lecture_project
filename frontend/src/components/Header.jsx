@@ -5,6 +5,7 @@ const LABELS = {
   VectorBars: '벡터 표현',
   Scatter2D: '의미 공간',
   KeyPoints: '개념 정리',
+    Scatter2DLive: '청중 참여',
 }
 
 export default function Header({
