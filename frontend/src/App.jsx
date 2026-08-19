@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Intro from './components/Intro'
 import Stage from './components/Stage'
 import { generate, prefetchNext, prefetchFirst } from './api/prefetch'
 import useSpeech from './hooks/useSpeech'
@@ -7,15 +8,14 @@ import scenarioOrder from './fixtures/scenarioOrder.json'
 const PRESETS = scenarioOrder
 
 export default function App() {
+  const [started, setStarted] = useState(false)
   const [payload, setPayload] = useState(null)
-  const [history, setHistory] = useState([])   // 방향키 되돌리기용
+  const [history, setHistory] = useState([])
   const [cursor, setCursor] = useState(-1)
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [log, setLog] = useState(null)
-
-  // 앱이 뜨자마자 첫 발화를 미리 만들어 둔다
-  useEffect(() => { prefetchFirst() }, [])
+  const [panelOpen, setPanelOpen] = useState(true)
 
   const send = useCallback(async (utterance) => {
     if (!utterance?.trim()) return
@@ -42,7 +42,6 @@ export default function App() {
       }
 
       // 화면을 띄운 직후 다음 발화를 백그라운드에서 준비한다.
-      // 강사가 한 화면에서 말하는 동안 생성이 끝난다.
       prefetchNext(utterance)
     } catch (e) {
       setLog(`error: ${e.message}`)
@@ -56,8 +55,16 @@ export default function App() {
     cooldownMs: 3000,
   })
 
+  // 시작 시 첫 발화를 미리 만들고, 마이크가 있으면 인식을 켠다
+  const handleStart = useCallback(() => {
+    setStarted(true)
+    prefetchFirst()
+    if (supported) start()
+  }, [supported, start])
+
   // 방향키 수동 조작. 자동 생성이 실패해도 강의는 계속되어야 한다.
   useEffect(() => {
+    if (!started) return
     function onKey(e) {
       if (e.target.tagName === 'INPUT') return
       if (e.key === 'ArrowLeft' && cursor > 0) {
@@ -73,7 +80,39 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cursor, history])
+  }, [started, cursor, history])
+
+  // 조작 패널은 평소 숨긴다. 강의 화면에 개발용 UI가 계속 보이면 몰입이 깨진다.
+  useEffect(() => {
+    if (!started) return
+    let timer
+
+    function show() {
+      setPanelOpen(true)
+      clearTimeout(timer)
+      timer = setTimeout(() => setPanelOpen(false), 3000)
+    }
+
+    function onMove(e) {
+      // 화면 아래쪽 20%에 마우스가 들어오면 표시
+      if (e.clientY > window.innerHeight * 0.8) show()
+    }
+
+    show()  // 시작 직후엔 한 번 보여준다
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('keydown', show)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('keydown', show)
+    }
+  }, [started])
+
+  // 훅은 전부 위에서 선언한다. 조건부 return 아래에 훅이 오면 렌더마다
+  // 훅 개수가 달라져서 React가 에러를 낸다.
+  if (!started) {
+    return <Intro onStart={handleStart} micReady={supported} />
+  }
 
   return (
     <div className="relative min-h-screen">
@@ -94,7 +133,14 @@ export default function App() {
       )}
 
       {/* 조작 패널 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-800 p-4">
+      <div
+        className={`fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-800 p-4
+                    transition-all duration-300 ${
+                      panelOpen
+                        ? 'opacity-100 translate-y-0'
+                        : 'opacity-0 translate-y-full pointer-events-none'
+                    }`}
+      >
         <div className="max-w-5xl mx-auto">
           <div className="flex gap-2 mb-3">
             <button
