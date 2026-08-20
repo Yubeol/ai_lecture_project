@@ -5,6 +5,7 @@ import LectureManager from './components/LectureManager'
 import ScriptEditor from './components/ScriptEditor'
 import Header from './components/Header'
 import Stage from './components/Stage'
+import LogReview from './components/LogReview'
 import {
   generate, prefetchNext, prefetchFirst, matchScript, setScriptOrder,
   scatterInit, scatterAdd,
@@ -41,6 +42,7 @@ export default function App() {
   const [matchInfo, setMatchInfo] = useState(null)
   const [liveMode, setLiveMode] = useState(false)
   const [noteIdx, setNoteIdx] = useState(-1)   // 현재 발화의 대본 위치
+    const [logTarget, setLogTarget] = useState(null)   // {id, title}
 
   const started = view === 'lecture'
 
@@ -276,14 +278,24 @@ export default function App() {
     }
   }, [started])
 
-  // 훅은 전부 위에서 선언한다. 조건부 return 아래에 훅이 오면 렌더마다
-  // 훅 개수가 달라져서 React가 에러를 낸다.
+
+      if (view === 'logs' && logTarget) {
+    return (
+      <LogReview
+        lectureId={logTarget.id}
+        title={logTarget.title}
+        onBack={() => setView('manage')}
+      />
+    )
+  }
+
   if (view === 'manage') {
     return (
       <LectureManager
         currentId={lectureId}
         onPick={async (id) => { await pickLecture(id); setView('intro') }}
         onEdit={async (id) => { await pickLecture(id); setView('editor') }}
+        onLogs={(id, title) => { setLogTarget({ id, title }); setView('logs') }}
         onNew={() => {
           setScript(EMPTY_SCRIPT)
           setLectureId(null)

@@ -55,3 +55,9 @@ export function logStep(entry) {
     body: JSON.stringify(entry),
   }).catch(() => {})
 }
+
+export async function getLogs(lectureId) {
+  const res = await fetch(`${BASE}/${lectureId}/logs`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return (await res.json()).data
+}

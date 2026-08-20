@@ -1,6 +1,6 @@
 import scenarioCache from '../fixtures/scenario.json'
 
-const TIMEOUT_MS = 8000
+const TIMEOUT_MS = 15000
 
 /** 현재 강의의 대본. App이 시작할 때 넣어준다. */
 let order = []

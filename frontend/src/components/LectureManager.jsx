@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowLeft, Plus, Pencil, Trash2, Search, Loader2, Check, BookOpen,
+  ArrowLeft, Plus, Pencil, Trash2, Search, Loader2, Check, BookOpen, Activity,
 } from 'lucide-react'
 import { listLectures, deleteLecture } from '../api/lectures'
 
 export default function LectureManager({
-  currentId, onPick, onEdit, onNew, onBack,
+  currentId, onPick, onEdit, onLogs, onNew, onBack,
 }) {
   const [items, setItems] = useState(null)
   const [query, setQuery] = useState('')
@@ -178,6 +178,13 @@ export default function LectureManager({
                       ) : (
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100
                                         transition-opacity">
+                                                      <button
+                            onClick={() => onLogs(l.id, l.title)}
+                            title="강의 기록"
+                            className="p-2 text-slate-600 hover:text-slate-300"
+                          >
+                            <Activity size={16} />
+                          </button>
                           <button
                             onClick={() => onEdit(l.id)}
                             title="편집"
