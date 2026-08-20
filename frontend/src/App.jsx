@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Mic, MicOff, Loader2, Send, Users } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Mic, MicOff, Loader2, Send, Users, StickyNote } from 'lucide-react'
 import Intro from './components/Intro'
+import LectureManager from './components/LectureManager'
 import ScriptEditor from './components/ScriptEditor'
 import Header from './components/Header'
 import Stage from './components/Stage'
@@ -22,10 +23,10 @@ const LIVE_SEED = [
   '버스가 정류장에 도착했다',
 ]
 
-const EMPTY_SCRIPT = { title: '', topic: '', utterances: [''] }
+const EMPTY_SCRIPT = { title: '', topic: '', utterances: [{ text: '', note: '' }] }
 
 export default function App() {
-  const [view, setView] = useState('intro')   // intro | editor | lecture
+  const [view, setView] = useState('intro')   // intro | manage | editor | lecture
   const [script, setScript] = useState(DEFAULT_SCRIPT)
   const [lectureId, setLectureId] = useState(null)
   const [sessionId, setSessionId] = useState(null)
@@ -39,8 +40,12 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(true)
   const [matchInfo, setMatchInfo] = useState(null)
   const [liveMode, setLiveMode] = useState(false)
+  const [noteIdx, setNoteIdx] = useState(-1)   // 현재 발화의 대본 위치
 
   const started = view === 'lecture'
+
+  // 매칭·선행 생성은 텍스트만 쓴다
+  const texts = useMemo(() => script.utterances.map((u) => u.text), [script])
 
   // 청중이 말한 문장을 기존 축에 투영해 점으로 추가한다.
   const addPoint = useCallback(async (sentence) => {
@@ -71,15 +76,17 @@ export default function App() {
 
     let target = utterance
     let matched = null
+    let idx = opts.index ?? -1
 
     // 대본 모드: 발화를 대본 문장으로 정규화한다.
     // STT가 조사·어미를 흘려도 정확한 대본으로 바꿔 보내므로 선행 생성이 항상 적중한다.
     if (mode === 'script' && !opts.exact) {
-      const m = await matchScript(utterance, script.utterances)
+      const m = await matchScript(utterance, texts)
       setMatchInfo(m)
       matched = m
       if (m && m.matched) {
-        target = script.utterances[m.index]
+        target = texts[m.index]
+        idx = m.index
       } else {
         setLog(`대본에 없는 발화 (최고 ${m ? m.score : '?'})`)
         if (sessionId) {
@@ -94,6 +101,8 @@ export default function App() {
     } else {
       setMatchInfo(null)
     }
+
+    setNoteIdx(idx)
 
     try {
       const res = await generate(target)
@@ -117,7 +126,7 @@ export default function App() {
           logStep({
             session_id: sessionId,
             heard: utterance,
-            matched_seq: matched?.index ?? null,
+            matched_seq: idx >= 0 ? idx : null,
             match_score: matched?.score ?? null,
             component: name,
             payload: res.payload,
@@ -131,7 +140,7 @@ export default function App() {
         if (sessionId) {
           logStep({
             session_id: sessionId, heard: utterance,
-            matched_seq: matched?.index ?? null,
+            matched_seq: idx >= 0 ? idx : null,
             match_score: matched?.score ?? null,
             component: 'none', source: 'skip',
           })
@@ -145,7 +154,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [mode, script, liveMode, addPoint, sessionId])
+  }, [mode, texts, liveMode, addPoint, sessionId])
 
   // 청중 참여 구간 시작. PCA 축을 서버에 고정하고 Live 산점도로 전환한다.
   const startLive = useCallback(async () => {
@@ -179,7 +188,7 @@ export default function App() {
       setScript({
         title: lec.title,
         topic: lec.topic ?? '',
-        utterances: lec.utterances.map((u) => u.text),
+        utterances: lec.utterances.map((u) => ({ text: u.text, note: u.note ?? '' })),
       })
       setLectureId(id)
     } catch {
@@ -191,7 +200,7 @@ export default function App() {
   const handleStart = useCallback(async (selectedMode) => {
     setMode(selectedMode)
     setView('lecture')
-    setScriptOrder(script.utterances)
+    setScriptOrder(texts)
     if (selectedMode === 'script') prefetchFirst()
     if (supported) start()
 
@@ -203,7 +212,7 @@ export default function App() {
         setSessionId(null)
       }
     }
-  }, [supported, start, script, lectureId])
+  }, [supported, start, texts, lectureId])
 
   // 처음 화면으로. 리허설을 여러 번 돌릴 때 새로고침 없이 되돌린다.
   const handleReset = useCallback(() => {
@@ -217,13 +226,14 @@ export default function App() {
     setMatchInfo(null)
     setLiveMode(false)
     setSessionId(null)
+    setNoteIdx(-1)
   }, [stop])
 
   // 방향키 수동 조작. 자동 생성이 실패해도 강의는 계속되어야 한다.
   useEffect(() => {
     if (!started) return
     function onKey(e) {
-      if (e.target.tagName === 'INPUT') return
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
       if (e.key === 'Escape') handleReset()
       if (e.key === 'ArrowLeft' && cursor > 0) {
         const i = cursor - 1
@@ -268,6 +278,22 @@ export default function App() {
 
   // 훅은 전부 위에서 선언한다. 조건부 return 아래에 훅이 오면 렌더마다
   // 훅 개수가 달라져서 React가 에러를 낸다.
+  if (view === 'manage') {
+    return (
+      <LectureManager
+        currentId={lectureId}
+        onPick={async (id) => { await pickLecture(id); setView('intro') }}
+        onEdit={async (id) => { await pickLecture(id); setView('editor') }}
+        onNew={() => {
+          setScript(EMPTY_SCRIPT)
+          setLectureId(null)
+          setView('editor')
+        }}
+        onBack={() => setView('intro')}
+      />
+    )
+  }
+
   if (view === 'editor') {
     return (
       <ScriptEditor
@@ -277,7 +303,9 @@ export default function App() {
           setScript({
             title: saved.title,
             topic: saved.topic ?? '',
-            utterances: saved.utterances.map((u) => u.text),
+            utterances: saved.utterances.map((u) => ({
+              text: u.text, note: u.note ?? '',
+            })),
           })
           setLectureId(saved.id)
           setView('intro')
@@ -292,18 +320,14 @@ export default function App() {
       <Intro
         onStart={handleStart}
         onEditScript={() => setView('editor')}
-        onNewLecture={() => {
-          setScript(EMPTY_SCRIPT)
-          setLectureId(null)
-          setView('editor')
-        }}
-        onPickLecture={pickLecture}
+        onManage={() => setView('manage')}
         script={script}
-        lectureId={lectureId}
         micReady={supported}
       />
     )
   }
+
+  const currentNote = noteIdx >= 0 ? script.utterances[noteIdx]?.note : ''
 
   return (
     <div className="relative min-h-screen">
@@ -347,6 +371,18 @@ export default function App() {
                     }`}
       >
         <div className="max-w-5xl mx-auto">
+          {/* 발표자 노트. 강사만 본다. */}
+          {currentNote && (
+            <div className="flex items-start gap-3 mb-3 px-4 py-3 rounded-lg
+                            bg-emerald-950/25 border border-emerald-900/50">
+              <StickyNote size={15} className="text-emerald-500 shrink-0 mt-0.5" />
+              <p className="text-emerald-100/80 leading-relaxed">{currentNote}</p>
+              <span className="ml-auto shrink-0 text-sm text-emerald-700 tnum">
+                {noteIdx + 1}/{texts.length}
+              </span>
+            </div>
+          )}
+
           <div className="flex gap-2 mb-3">
             <button
               onClick={listening ? stop : start}
@@ -411,16 +447,19 @@ export default function App() {
 
           {mode === 'script' && !liveMode && (
             <div className="flex flex-wrap gap-2">
-              {script.utterances.map((p, i) => (
+              {script.utterances.map((u, i) => (
                 <button
-                  key={`${i}-${p}`}
-                  onClick={() => send(p, { exact: true })}
+                  key={`${i}-${u.text}`}
+                  onClick={() => send(u.text, { exact: true, index: i })}
                   disabled={loading}
-                  className="px-3 py-1 text-sm rounded bg-slate-800 hover:bg-slate-700
-                             text-slate-300 disabled:opacity-40"
+                  className={`px-3 py-1 text-sm rounded disabled:opacity-40 ${
+                    noteIdx === i
+                      ? 'bg-emerald-800/60 text-emerald-100'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
                 >
                   <span className="text-slate-500 mr-1">{i + 1}</span>
-                  {p.slice(0, 20)}...
+                  {u.text.slice(0, 20)}...
                 </button>
               ))}
             </div>

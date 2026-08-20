@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Plus, Trash2, ArrowUp, ArrowDown, Upload, Download,
-  AlertTriangle, Check, X, Loader2,
+  AlertTriangle, Check, X, Loader2, StickyNote,
 } from 'lucide-react'
 import { parseScript, downloadScript } from '../lib/script'
 import { checkAmbiguity } from '../api/prefetch'
 import { createLecture, updateLecture } from '../api/lectures'
 
+/** 대본 배열을 {text, note} 형태로 정규화한다. 문자열 배열도 받는다. */
+function normalize(utterances) {
+  return utterances.map((u) =>
+    typeof u === 'string' ? { text: u, note: '' } : { text: u.text, note: u.note ?? '' }
+  )
+}
+
 export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
   const [title, setTitle] = useState(script.title)
   const [topic, setTopic] = useState(script.topic ?? '')
-  const [lines, setLines] = useState(script.utterances)
+  const [lines, setLines] = useState(() => normalize(script.utterances))
+  const [openNotes, setOpenNotes] = useState(() => new Set())
   const [warnings, setWarnings] = useState([])
   const [checking, setChecking] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -20,7 +28,7 @@ export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
   // 대본이 바뀌면 헷갈리는 줄이 있는지 검사한다.
   // 두 줄이 지나치게 비슷하면 음성 매칭이 엉뚱한 곳으로 간다.
   useEffect(() => {
-    const valid = lines.map((l) => l.trim()).filter(Boolean)
+    const valid = lines.map((l) => l.text.trim()).filter(Boolean)
     if (valid.length < 2) { setWarnings([]); return }
 
     setChecking(true)
@@ -32,12 +40,12 @@ export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
     return () => { clearTimeout(t); setChecking(false) }
   }, [lines])
 
-  function update(i, value) {
-    setLines((ls) => ls.map((l, k) => (k === i ? value : l)))
+  function update(i, field, value) {
+    setLines((ls) => ls.map((l, k) => (k === i ? { ...l, [field]: value } : l)))
   }
 
   function add(at) {
-    setLines((ls) => [...ls.slice(0, at + 1), '', ...ls.slice(at + 1)])
+    setLines((ls) => [...ls.slice(0, at + 1), { text: '', note: '' }, ...ls.slice(at + 1)])
   }
 
   function remove(i) {
@@ -54,24 +62,34 @@ export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
     })
   }
 
+  function toggleNote(i) {
+    setOpenNotes((s) => {
+      const next = new Set(s)
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
+
   async function onFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
     const text = await file.text()
     const parsed = parseScript(text)
     if (parsed.title) setTitle(parsed.title)
-    if (parsed.utterances.length) setLines(parsed.utterances)
+    if (parsed.utterances.length) setLines(normalize(parsed.utterances))
     e.target.value = ''   // 같은 파일을 다시 골라도 이벤트가 오도록
   }
 
   async function save() {
-    const cleaned = lines.map((l) => l.trim()).filter(Boolean)
+    const cleaned = lines
+      .map((l) => ({ text: l.text.trim(), note: l.note?.trim() || null }))
+      .filter((l) => l.text)
     if (!cleaned.length) return
 
     const payload = {
       title: title.trim() || '제목 없는 강의',
       topic: topic.trim() || null,
-      utterances: cleaned.map((text) => ({ text })),
+      utterances: cleaned,
     }
 
     setSaving(true)
@@ -90,6 +108,7 @@ export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
   }
 
   const warnIdx = new Set(warnings.flatMap((w) => [w.i, w.j]))
+  const noteCount = lines.filter((l) => l.note?.trim()).length
 
   return (
     <div className="min-h-screen px-8 py-14">
@@ -111,7 +130,9 @@ export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
               <Upload size={15} /> 불러오기
             </button>
             <button
-              onClick={() => downloadScript(title, lines.filter((l) => l.trim()))}
+              onClick={() =>
+                downloadScript(title, lines.map((l) => l.text).filter(Boolean))
+              }
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm
                          border border-slate-800 text-slate-300 hover:border-slate-600"
             >
@@ -142,46 +163,80 @@ export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
         </div>
 
         <div className="space-y-2 mb-6">
-          {lines.map((line, i) => (
-            <div key={i} className="group flex items-center gap-2">
-              <span className={`w-7 text-right text-sm tnum shrink-0 ${
-                warnIdx.has(i) ? 'text-amber-400' : 'text-slate-600'
-              }`}>
-                {i + 1}
-              </span>
+          {lines.map((line, i) => {
+            const noteOpen = openNotes.has(i) || !!line.note
+            return (
+              <div key={i}>
+                <div className="group flex items-center gap-2">
+                  <span className={`w-7 text-right text-sm tnum shrink-0 ${
+                    warnIdx.has(i) ? 'text-amber-400' : 'text-slate-600'
+                  }`}>
+                    {i + 1}
+                  </span>
 
-              <input
-                value={line}
-                onChange={(e) => update(i, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); add(i) }
-                  if (e.key === 'Backspace' && !line && lines.length > 1) {
-                    e.preventDefault(); remove(i)
-                  }
-                }}
-                placeholder="발화를 입력하세요"
-                className={`flex-1 px-4 py-2.5 rounded-lg bg-slate-900/50 text-slate-100
-                            border outline-none focus:border-slate-600 ${
-                              warnIdx.has(i) ? 'border-amber-800/70' : 'border-slate-800'
-                            }`}
-              />
+                  <input
+                    value={line.text}
+                    onChange={(e) => update(i, 'text', e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); add(i) }
+                      if (e.key === 'Backspace' && !line.text && lines.length > 1) {
+                        e.preventDefault(); remove(i)
+                      }
+                    }}
+                    placeholder="발화를 입력하세요"
+                    className={`flex-1 px-4 py-2.5 rounded-lg bg-slate-900/50 text-slate-100
+                                border outline-none focus:border-slate-600 ${
+                                  warnIdx.has(i) ? 'border-amber-800/70' : 'border-slate-800'
+                                }`}
+                  />
 
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => move(i, -1)} disabled={i === 0}
-                        className="p-1.5 text-slate-600 hover:text-slate-300 disabled:opacity-25">
-                  <ArrowUp size={15} />
-                </button>
-                <button onClick={() => move(i, 1)} disabled={i === lines.length - 1}
-                        className="p-1.5 text-slate-600 hover:text-slate-300 disabled:opacity-25">
-                  <ArrowDown size={15} />
-                </button>
-                <button onClick={() => remove(i)} disabled={lines.length === 1}
-                        className="p-1.5 text-slate-600 hover:text-rose-400 disabled:opacity-25">
-                  <Trash2 size={15} />
-                </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => toggleNote(i)}
+                      title="발표자 노트"
+                      className={`p-1.5 transition-colors ${
+                        line.note?.trim()
+                          ? 'text-emerald-500'
+                          : 'text-slate-700 hover:text-slate-400 opacity-0 group-hover:opacity-100'
+                      }`}
+                    >
+                      <StickyNote size={15} />
+                    </button>
+
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => move(i, -1)} disabled={i === 0}
+                              className="p-1.5 text-slate-600 hover:text-slate-300 disabled:opacity-25">
+                        <ArrowUp size={15} />
+                      </button>
+                      <button onClick={() => move(i, 1)} disabled={i === lines.length - 1}
+                              className="p-1.5 text-slate-600 hover:text-slate-300 disabled:opacity-25">
+                        <ArrowDown size={15} />
+                      </button>
+                      <button onClick={() => remove(i)} disabled={lines.length === 1}
+                              className="p-1.5 text-slate-600 hover:text-rose-400 disabled:opacity-25">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 발표자 노트. 화면에는 안 뜨고 강사에게만 보인다. */}
+                {noteOpen && (
+                  <div className="flex gap-2 mt-1.5 ml-9">
+                    <textarea
+                      value={line.note}
+                      onChange={(e) => update(i, 'note', e.target.value)}
+                      placeholder="이 화면에서 할 말 (청중에게는 보이지 않습니다)"
+                      rows={2}
+                      className="flex-1 px-4 py-2.5 rounded-lg bg-slate-900/30
+                                 text-slate-400 text-sm leading-relaxed resize-none
+                                 border border-slate-800/70 outline-none focus:border-slate-700"
+                    />
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <button
@@ -236,7 +291,7 @@ export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
           <span className="ml-auto text-sm text-slate-600">
             {checking
               ? '검사 중...'
-              : `${lines.filter((l) => l.trim()).length}개 발화`}
+              : `발화 ${lines.filter((l) => l.text.trim()).length}개 · 노트 ${noteCount}개`}
           </span>
         </div>
       </div>
