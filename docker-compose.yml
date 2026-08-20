@@ -1,2 +1,23 @@
 services:
-  
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: lecture_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kogo
+      POSTGRES_PASSWORD: math1106
+      POSTGRES_DB: lecture
+      TZ: Asia/Seoul
+    ports:
+      - "5433:5432"          # 기존 5432와 충돌을 피한다
+    volumes:
+      - lecture_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kogo -d lecture"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  lecture_pgdata:

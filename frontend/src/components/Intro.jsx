@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Mic, Sparkles, Ruler, ArrowRight, ScrollText, Wand2, Pencil,
+  Mic, Sparkles, Ruler, ArrowRight, ScrollText, Wand2, Pencil, Plus, Loader2,
 } from 'lucide-react'
+import { listLectures } from '../api/lectures'
 
 const STACK = [
   { icon: Mic, label: '음성 인식', sub: 'Web Speech API', color: 'text-rose-400' },
@@ -34,8 +35,15 @@ const fade = {
   }),
 }
 
-export default function Intro({ onStart, onEditScript, script, micReady }) {
+export default function Intro({
+  onStart, onEditScript, onPickLecture, onNewLecture, script, lectureId, micReady,
+}) {
   const [mode, setMode] = useState('script')
+  const [lectures, setLectures] = useState(null)
+
+  useEffect(() => {
+    listLectures().then(setLectures).catch(() => setLectures([]))
+  }, [])
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-16">
@@ -108,20 +116,72 @@ export default function Intro({ onStart, onEditScript, script, micReady }) {
             ))}
           </div>
 
-          {/* 대본 모드일 때만 현재 대본을 보여준다 */}
+          {/* 대본 모드에서만 강의 목록 */}
           {mode === 'script' && (
-            <div className="mb-9 rounded-xl border border-slate-800 bg-slate-900/30 px-5 py-4">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-slate-300">{script.title}</span>
-                <button
-                  onClick={onEditScript}
-                  className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300"
-                >
-                  <Pencil size={13} /> 편집
-                </button>
+            <div className="mb-9 rounded-xl border border-slate-800 bg-slate-900/30
+                            px-5 py-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-slate-500">저장된 강의</span>
+                <div className="flex gap-3">
+                  <button
+                    onClick={onNewLecture}
+                    className="flex items-center gap-1.5 text-sm text-slate-500
+                               hover:text-slate-300"
+                  >
+                    <Plus size={13} /> 새 강의
+                  </button>
+                  <button
+                    onClick={onEditScript}
+                    className="flex items-center gap-1.5 text-sm text-slate-500
+                               hover:text-slate-300"
+                  >
+                    <Pencil size={13} /> 편집
+                  </button>
+                </div>
               </div>
-              <div className="text-sm text-slate-500">
-                발화 {script.utterances.length}개 · 첫 문장 “{script.utterances[0]}”
+
+              {lectures === null ? (
+                <div className="flex items-center gap-2 text-sm text-slate-600 py-2">
+                  <Loader2 size={14} className="animate-spin" /> 불러오는 중
+                </div>
+              ) : lectures.length === 0 ? (
+                <div className="text-sm text-slate-600 py-2">
+                  저장된 강의가 없습니다. 편집에서 만들어 저장하세요.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {lectures.map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => onPickLecture(l.id)}
+                      className={`w-full text-left px-4 py-2.5 rounded-lg border
+                                  transition-colors ${
+                        lectureId === l.id
+                          ? 'border-emerald-500/50 bg-emerald-950/25'
+                          : 'border-transparent hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {l.topic && (
+                          <span className="px-2 py-0.5 rounded text-xs
+                                           bg-slate-800 text-slate-400">
+                            {l.topic}
+                          </span>
+                        )}
+                        <span className="text-slate-200">{l.title}</span>
+                        <span className="ml-auto text-sm text-slate-600 tnum">
+                          {l.count}개
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 pt-3 border-t border-slate-800 text-sm text-slate-500">
+                선택됨 · {script.title}
+                <span className="text-slate-700 mx-2">/</span>
+                발화 {script.utterances.length}개
               </div>
             </div>
           )}

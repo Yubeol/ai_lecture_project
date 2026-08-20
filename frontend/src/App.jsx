@@ -8,6 +8,7 @@ import {
   generate, prefetchNext, prefetchFirst, matchScript, setScriptOrder,
   scatterInit, scatterAdd,
 } from './api/prefetch'
+import { getLecture, startSession, logStep } from './api/lectures'
 import useSpeech from './hooks/useSpeech'
 import { DEFAULT_SCRIPT } from './lib/script'
 
@@ -21,9 +22,13 @@ const LIVE_SEED = [
   '버스가 정류장에 도착했다',
 ]
 
+const EMPTY_SCRIPT = { title: '', topic: '', utterances: [''] }
+
 export default function App() {
   const [view, setView] = useState('intro')   // intro | editor | lecture
   const [script, setScript] = useState(DEFAULT_SCRIPT)
+  const [lectureId, setLectureId] = useState(null)
+  const [sessionId, setSessionId] = useState(null)
   const [mode, setMode] = useState('script')
   const [payload, setPayload] = useState(null)
   const [history, setHistory] = useState([])
@@ -65,16 +70,24 @@ export default function App() {
     setLog(null)
 
     let target = utterance
+    let matched = null
 
     // 대본 모드: 발화를 대본 문장으로 정규화한다.
     // STT가 조사·어미를 흘려도 정확한 대본으로 바꿔 보내므로 선행 생성이 항상 적중한다.
     if (mode === 'script' && !opts.exact) {
       const m = await matchScript(utterance, script.utterances)
       setMatchInfo(m)
+      matched = m
       if (m && m.matched) {
         target = script.utterances[m.index]
       } else {
         setLog(`대본에 없는 발화 (최고 ${m ? m.score : '?'})`)
+        if (sessionId) {
+          logStep({
+            session_id: sessionId, heard: utterance,
+            match_score: m?.score ?? null, source: 'unmatched',
+          })
+        }
         setLoading(false)
         return
       }
@@ -93,13 +106,36 @@ export default function App() {
           return next
         })
         const name = res.payload.component
+        const source = res.prefetched ? 'prefetch' : res.cached ? 'cache' : 'realtime'
         setLog(
           res.prefetched ? `${name} · 선행 생성 (0.0s)`
           : res.cached   ? `${name} · cached (생성 실패 → 사전 생성분)`
           : `${name} · LLM ${res.timing.llm}s · embed ${res.timing.embed}s`
         )
+
+        if (sessionId) {
+          logStep({
+            session_id: sessionId,
+            heard: utterance,
+            matched_seq: matched?.index ?? null,
+            match_score: matched?.score ?? null,
+            component: name,
+            payload: res.payload,
+            source,
+            llm_ms: Math.round((res.timing?.llm ?? 0) * 1000),
+            embed_ms: Math.round((res.timing?.embed ?? 0) * 1000),
+          })
+        }
       } else {
         setLog(`skip: ${res.reason}`)
+        if (sessionId) {
+          logStep({
+            session_id: sessionId, heard: utterance,
+            matched_seq: matched?.index ?? null,
+            match_score: matched?.score ?? null,
+            component: 'none', source: 'skip',
+          })
+        }
       }
 
       // 화면을 띄운 직후 다음 발화를 백그라운드에서 준비한다.
@@ -109,7 +145,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [mode, script, liveMode, addPoint])
+  }, [mode, script, liveMode, addPoint, sessionId])
 
   // 청중 참여 구간 시작. PCA 축을 서버에 고정하고 Live 산점도로 전환한다.
   const startLive = useCallback(async () => {
@@ -136,14 +172,38 @@ export default function App() {
     cooldownMs: 3000,
   })
 
+  // DB에서 강의를 불러온다
+  const pickLecture = useCallback(async (id) => {
+    try {
+      const lec = await getLecture(id)
+      setScript({
+        title: lec.title,
+        topic: lec.topic ?? '',
+        utterances: lec.utterances.map((u) => u.text),
+      })
+      setLectureId(id)
+    } catch {
+      /* 목록에서 고른 것이므로 실패해도 조용히 둔다 */
+    }
+  }, [])
+
   // 인트로에서 고른 모드로 시작한다
-  const handleStart = useCallback((selectedMode) => {
+  const handleStart = useCallback(async (selectedMode) => {
     setMode(selectedMode)
     setView('lecture')
     setScriptOrder(script.utterances)
     if (selectedMode === 'script') prefetchFirst()
     if (supported) start()
-  }, [supported, start, script])
+
+    // 실행 기록용 세션. 실패해도 강의는 진행되어야 한다.
+    if (lectureId) {
+      try {
+        setSessionId(await startSession(lectureId))
+      } catch {
+        setSessionId(null)
+      }
+    }
+  }, [supported, start, script, lectureId])
 
   // 처음 화면으로. 리허설을 여러 번 돌릴 때 새로고침 없이 되돌린다.
   const handleReset = useCallback(() => {
@@ -156,6 +216,7 @@ export default function App() {
     setLog(null)
     setMatchInfo(null)
     setLiveMode(false)
+    setSessionId(null)
   }, [stop])
 
   // 방향키 수동 조작. 자동 생성이 실패해도 강의는 계속되어야 한다.
@@ -211,7 +272,16 @@ export default function App() {
     return (
       <ScriptEditor
         script={script}
-        onSave={(s) => { setScript(s); setView('intro') }}
+        lectureId={lectureId}
+        onSaved={(saved) => {
+          setScript({
+            title: saved.title,
+            topic: saved.topic ?? '',
+            utterances: saved.utterances.map((u) => u.text),
+          })
+          setLectureId(saved.id)
+          setView('intro')
+        }}
         onCancel={() => setView('intro')}
       />
     )
@@ -222,7 +292,14 @@ export default function App() {
       <Intro
         onStart={handleStart}
         onEditScript={() => setView('editor')}
+        onNewLecture={() => {
+          setScript(EMPTY_SCRIPT)
+          setLectureId(null)
+          setView('editor')
+        }}
+        onPickLecture={pickLecture}
         script={script}
+        lectureId={lectureId}
         micReady={supported}
       />
     )

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     max_tokens: int = 800
 
     embed_model: str = "jhgan/ko-sroberta-multitask"
+    database_url: str = "postgresql+psycopg://kogo:math1106@localhost:5433/lecture"
 
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 

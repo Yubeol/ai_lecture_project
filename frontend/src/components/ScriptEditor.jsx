@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Plus, Trash2, ArrowUp, ArrowDown, Upload, Download,
-  AlertTriangle, Check, X,
+  AlertTriangle, Check, X, Loader2,
 } from 'lucide-react'
 import { parseScript, downloadScript } from '../lib/script'
 import { checkAmbiguity } from '../api/prefetch'
+import { createLecture, updateLecture } from '../api/lectures'
 
-export default function ScriptEditor({ script, onSave, onCancel }) {
+export default function ScriptEditor({ script, lectureId, onSaved, onCancel }) {
   const [title, setTitle] = useState(script.title)
+  const [topic, setTopic] = useState(script.topic ?? '')
   const [lines, setLines] = useState(script.utterances)
   const [warnings, setWarnings] = useState([])
   const [checking, setChecking] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
   const fileRef = useRef(null)
 
   // 대본이 바뀌면 헷갈리는 줄이 있는지 검사한다.
@@ -60,10 +64,29 @@ export default function ScriptEditor({ script, onSave, onCancel }) {
     e.target.value = ''   // 같은 파일을 다시 골라도 이벤트가 오도록
   }
 
-  function save() {
+  async function save() {
     const cleaned = lines.map((l) => l.trim()).filter(Boolean)
     if (!cleaned.length) return
-    onSave({ title: title.trim() || '제목 없는 강의', utterances: cleaned })
+
+    const payload = {
+      title: title.trim() || '제목 없는 강의',
+      topic: topic.trim() || null,
+      utterances: cleaned.map((text) => ({ text })),
+    }
+
+    setSaving(true)
+    setError(null)
+    try {
+      // 기존 강의를 편집 중이면 갱신, 아니면 새로 만든다
+      const saved = lectureId
+        ? await updateLecture(lectureId, payload)
+        : await createLecture(payload)
+      onSaved(saved)
+    } catch (e) {
+      setError(`저장 실패: ${e.message}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const warnIdx = new Set(warnings.flatMap((w) => [w.i, w.j]))
@@ -74,7 +97,9 @@ export default function ScriptEditor({ script, onSave, onCancel }) {
         <div className="flex items-start justify-between mb-8">
           <div>
             <p className="text-sm tracking-[0.2em] text-emerald-400 mb-3">SCRIPT</p>
-            <h1 className="text-4xl font-bold text-white tracking-tight">대본 편집</h1>
+            <h1 className="text-4xl font-bold text-white tracking-tight">
+              {lectureId ? '대본 편집' : '새 강의'}
+            </h1>
           </div>
 
           <div className="flex gap-2">
@@ -99,13 +124,22 @@ export default function ScriptEditor({ script, onSave, onCancel }) {
           </div>
         </div>
 
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="강의 제목"
-          className="w-full mb-7 px-4 py-3 rounded-lg bg-slate-900/50 text-xl text-slate-100
-                     border border-slate-800 outline-none focus:border-slate-600"
-        />
+        <div className="flex gap-3 mb-7">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="강의 제목"
+            className="flex-1 px-4 py-3 rounded-lg bg-slate-900/50 text-xl text-slate-100
+                       border border-slate-800 outline-none focus:border-slate-600"
+          />
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="주제 (임베딩, 머신러닝 …)"
+            className="w-56 px-4 py-3 rounded-lg bg-slate-900/50 text-slate-300
+                       border border-slate-800 outline-none focus:border-slate-600"
+          />
+        </div>
 
         <div className="space-y-2 mb-6">
           {lines.map((line, i) => (
@@ -181,10 +215,13 @@ export default function ScriptEditor({ script, onSave, onCancel }) {
         <div className="flex items-center gap-3">
           <button
             onClick={save}
+            disabled={saving}
             className="flex items-center gap-2 px-7 py-3 rounded-lg bg-emerald-600
-                       hover:bg-emerald-500 text-white font-medium"
+                       hover:bg-emerald-500 disabled:opacity-50 text-white font-medium"
           >
-            <Check size={18} /> 저장
+            {saving
+              ? <><Loader2 size={18} className="animate-spin" /> 저장 중</>
+              : <><Check size={18} /> 저장</>}
           </button>
           <button
             onClick={onCancel}
@@ -193,6 +230,8 @@ export default function ScriptEditor({ script, onSave, onCancel }) {
           >
             <X size={18} /> 취소
           </button>
+
+          {error && <span className="text-sm text-rose-400">{error}</span>}
 
           <span className="ml-auto text-sm text-slate-600">
             {checking
