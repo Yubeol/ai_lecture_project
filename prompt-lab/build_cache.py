@@ -87,15 +87,18 @@ def main():
         console.print("[bold green]시나리오 전체 정상[/bold green]")
 
     if args.write:
-        OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
-        OUT_JSON.write_text(
-            json.dumps(cache, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        console.print(f"\n[dim]→ {OUT_JSON.relative_to(ROOT)}  ({len(cache)}건)[/dim]")
+        if not cache:
+            console.print("\n[bold red]생성된 항목이 없어 파일을 쓰지 않습니다[/bold red]")
+            console.print("[dim]기존 캐시를 보존합니다[/dim]")
+        else:
+            OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
+            OUT_JSON.write_text(
+                json.dumps(cache, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            console.print(f"\n[dim]→ {OUT_JSON.relative_to(ROOT)}  ({len(cache)}건)[/dim]")
     else:
         console.print("\n[dim]--write 를 붙이면 프론트 캐시 파일에 기록합니다[/dim]")
-
 
 if __name__ == "__main__":
     main()
