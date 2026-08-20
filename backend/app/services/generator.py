@@ -81,6 +81,11 @@ def enrich(payload: dict) -> dict:
     elif name == "ThresholdSim":
         payload["data"] = embedder.threshold_pairs(payload["pairs"])
 
+    elif name == "CosineAngle":
+        payload["data"] = [
+            embedder.cosine_angle(p[0], p[1]) for p in payload["pairs"]
+        ]
+
     return payload
 
 

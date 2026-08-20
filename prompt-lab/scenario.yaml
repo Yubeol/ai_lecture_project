@@ -2,7 +2,7 @@
 # 발표에서 실제로 말할 발화를 순서대로 적는다.
 
 scenario:
-  # ---------- 도입 (0:00~1:30) ----------
+  # ---------- 도입 (0:00~2:00) ----------
   - id: s01
     utterance: "검색창에 강아지 키우는 법이라고 쳤는데 반려견 양육 가이드라는 글이 나옵니다"
     expect: SimilarityGauge
@@ -13,61 +13,70 @@ scenario:
     expect: SimilarityGauge
 
   - id: s03
-    utterance: "임베딩은 문장을 숫자 목록으로 바꿔서 의미를 다루는 기술입니다"
-    expect: VectorBars
+    utterance: "사람은 글자를 읽지만 컴퓨터는 숫자만 다룰 수 있습니다"
+    expect: Compare
 
-  # ---------- 벡터 (1:30~3:30) ----------
   - id: s04
+    utterance: "임베딩은 문장을 숫자 목록으로 바꿔서 의미를 다루는 기술입니다"
+    expect: Pipeline
+
+  # ---------- 벡터 (2:00~4:00) ----------
+  - id: s05
     utterance: "실제로 문장을 넣으면 이런 숫자들이 나옵니다"
     expect: VectorBars
 
-  - id: s05
+  - id: s06
     utterance: "문장 하나가 768개의 숫자로 바뀝니다"
     expect: VectorBars
 
-  - id: s06
+  - id: s07
     utterance: "이 숫자 하나하나가 뭘 뜻하는지 두 문장을 나란히 놓고 봐도 알 수 없습니다"
     expect: VectorBars
 
-  # ---------- 유사도 (3:30~5:30) ----------
-  - id: s07
+  # ---------- 유사도 (4:00~6:30) ----------
+  - id: s08
     utterance: "이 숫자로 두 문장이 얼마나 비슷한지 잴 수 있습니다"
     expect: SimilarityGauge
 
-  - id: s08
+  - id: s09
     utterance: "표현이 완전히 달라도 의미가 같으면 가까운 걸로 판단해요"
     expect: SimilarityGauge
 
-  - id: s09
+  - id: s10
     utterance: "반대로 아무 상관 없는 문장이면 점수가 확 떨어지겠죠"
     expect: SimilarityGauge
 
-  - id: s10
+  - id: s11
+    utterance: "이 점수가 사실은 두 벡터 사이의 각도입니다"
+    expect: CosineAngle
+    note: "왜 -1~1 범위인지, 왜 음수가 나오는지를 설명"
+
+  - id: s12
     utterance: "여기까지 질문 있으신가요"
     expect: none
     note: "잡담 방어 시연. 화면이 안 바뀌는 게 정상"
 
-  # ---------- 의미 공간 (5:30~7:00) ----------
-  - id: s11
+  # ---------- 의미 공간 (6:30~8:00) ----------
+  - id: s13
     utterance: "숫자 목록을 평면 위의 좌표라고 생각해보면 이해가 쉽습니다"
     expect: Scatter2D
 
-  - id: s12
+  - id: s14
     utterance: "이걸 평면에 찍어보면 비슷한 문장끼리 모여 있는 게 보입니다"
     expect: Scatter2D
 
-  # ---------- 청중 참여 (7:00~9:00) ----------
-  - id: s13
+  # ---------- 청중 참여 (8:00~9:30) ----------
+  - id: s15
     utterance: "그럼 여러분이 문장을 하나 말해보시면 어디에 놓이는지 보겠습니다"
     expect: none
-    note: "여기서 청중 참여 버튼을 누른다. 2분간 문장 받기"
+    note: "여기서 청중 참여 버튼을 누른다"
 
-  # ---------- 마무리 (9:00~10:00) ----------
-  - id: s14
+  # ---------- 마무리 (9:30~11:00) ----------
+  - id: s16
     utterance: "정리하면 임베딩은 의미를 좌표로 바꾸고 거리로 비교하는 기술입니다"
     expect: KeyPoints
 
-  - id: s15
+  - id: s17
     utterance: "지금 이 강의 화면도 제 말을 임베딩으로 매칭해서 띄운 것입니다"
-    expect: KeyPoints
+    expect: Pipeline
     note: "자기 참조. 헤더의 매칭 점수를 가리키며 마무리"

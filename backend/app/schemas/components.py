@@ -104,6 +104,59 @@ class KeyPoints(Base):
         return cleaned
 
 
+class CosineAngle(Base):
+    """코사인 유사도를 각도로 보여준다. 왜 -1~1 범위인지가 드러난다."""
+    component: Literal["CosineAngle"]
+    title: str = Field(min_length=1, max_length=40)
+    pairs: List[List[str]] = Field(min_length=1, max_length=3)
+    caption: str = Field(default="", max_length=120)
+
+    @field_validator("pairs")
+    @classmethod
+    def v_pairs(cls, v):
+        for p in v:
+            if len(p) != 2:
+                raise ValueError(f"pair는 문장 2개여야 함 (got {len(p)})")
+            a, b = _check_sentence(p[0]), _check_sentence(p[1])
+            if a == b:
+                raise ValueError("동일한 문장 쌍")
+        return v
+
+class PipelineStep(Base):
+    label: str = Field(min_length=1, max_length=24)
+    detail: str = Field(default="", max_length=40)
+
+
+class Pipeline(Base):
+    """처리 과정을 단계로 보여준다. 결과가 아니라 흐름을 설명할 때 쓴다.
+    수치가 없으므로 embedder 를 거치지 않는다."""
+    component: Literal["Pipeline"]
+    title: str = Field(min_length=1, max_length=40)
+    steps: List[PipelineStep] = Field(min_length=2, max_length=5)
+    caption: str = Field(default="", max_length=120)
+
+class CompareSide(Base):
+    heading: str = Field(min_length=1, max_length=24)
+    points: List[str] = Field(min_length=1, max_length=4)
+
+
+class Compare(Base):
+    """두 개념을 좌우로 대조한다. 차이를 설명할 때 쓴다.
+    수치가 없으므로 embedder 를 거치지 않는다."""
+    component: Literal["Compare"]
+    title: str = Field(min_length=1, max_length=40)
+    left: CompareSide
+    right: CompareSide
+    caption: str = Field(default="", max_length=120)
+
+    @field_validator("left", "right")
+    @classmethod
+    def v_side(cls, v):
+        for s in v.points:
+            if not (3 <= len(s.strip()) <= 45):
+                raise ValueError(f"항목 길이 이상({len(s)}자): {s!r}")
+        return v
+
 class NoOp(Base):
     """생성할 게 없을 때. 잡담/오인식 방어용."""
     component: Literal["none"]
@@ -117,6 +170,9 @@ REGISTRY = {
     "ThresholdSim": ThresholdSim,
     "KeyPoints": KeyPoints,
     "none": NoOp,
+    "CosineAngle": CosineAngle,
+    "Pipeline": Pipeline,
+    "Compare": Compare,
 }
 
 def validate_payload(obj) -> tuple[bool, str, str | None]:

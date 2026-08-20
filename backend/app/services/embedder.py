@@ -166,3 +166,18 @@ def scatter_add(session_id: str, sentence: str) -> dict:
 
 def scatter_clear(session_id: str) -> None:
     _scatter_sessions.pop(session_id, None)
+
+def cosine_angle(a: str, b: str) -> dict:
+    """두 문장을 각도로 표현한다.
+    코사인 유사도가 '방향의 닮음'이라는 걸 보여주기 위한 것.
+    768차원 각도는 그대로 2차원 평면에 옮겨도 값이 보존된다."""
+    score = cosine(a, b)
+    # 부동소수 오차로 acos 범위를 벗어나는 걸 막는다
+    clipped = max(-1.0, min(1.0, score))
+    deg = float(np.degrees(np.arccos(clipped)))
+    return {
+        "a": a,
+        "b": b,
+        "score": round(score, 4),
+        "angle": round(deg, 1),
+    }

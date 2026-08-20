@@ -6,6 +6,9 @@ const LABELS = {
   Scatter2D: '의미 공간',
   KeyPoints: '개념 정리',
     Scatter2DLive: '청중 참여',
+    CosineAngle: '각도로 보기',
+    Pipeline: '처리 과정',
+    Compare: '비교',
 }
 
 export default function Header({

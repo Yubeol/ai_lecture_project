@@ -94,12 +94,18 @@ def update_lecture(lecture_id: int, body: LectureIn, db: Session = Depends(get_d
 
     lec.title = body.title
     lec.topic = body.topic
-    # 순서가 바뀌면 매칭이 어긋나므로 통째로 교체한다
+
+    # 순서가 바뀌면 매칭이 어긋나므로 통째로 교체한다.
+    # UNIQUE(lecture_id, seq) 때문에 삭제를 먼저 반영해야 한다.
+    lec.utterances.clear()
+    db.flush()
+
     lec.utterances = [
         Utterance(seq=i, text=u.text, note=u.note)
         for i, u in enumerate(body.utterances)
     ]
     db.commit()
+    db.refresh(lec)
     return {"data": to_dict(lec)}
 
 

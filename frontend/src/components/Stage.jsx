@@ -5,12 +5,21 @@ import Scatter2D from './slides/Scatter2D'
 import KeyPoints from './slides/KeyPoints'
 import Scatter2DLive from './slides/Scatter2DLive'
 
+import CosineAngle from './slides/CosineAngle'
+
+import Pipeline from './slides/Pipeline'
+
+import Compare from './slides/Compare'
+
 const REGISTRY = {
   SimilarityGauge,
   VectorBars,
   Scatter2D,
   Scatter2DLive,
   KeyPoints,
+  CosineAngle,
+  Pipeline,
+  Compare,
 }
 /** 화면이 교체될 때마다 새 key를 만든다. 같은 컴포넌트라도 내용이 바뀌면 다시 그린다. */
 function keyOf(payload) {
