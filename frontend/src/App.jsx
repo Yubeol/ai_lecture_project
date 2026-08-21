@@ -2,15 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Mic, MicOff, Loader2, Send, Users, StickyNote } from 'lucide-react'
 import Intro from './components/Intro'
 import LectureManager from './components/LectureManager'
+import LogReview from './components/LogReview'
 import ScriptEditor from './components/ScriptEditor'
 import Header from './components/Header'
 import Stage from './components/Stage'
-import LogReview from './components/LogReview'
 import {
   generate, prefetchNext, prefetchFirst, matchScript, setScriptOrder,
   scatterInit, scatterAdd,
 } from './api/prefetch'
 import { getLecture, startSession, logStep } from './api/lectures'
+import { isRecall, findRecallTarget } from './lib/recall'
 import useSpeech from './hooks/useSpeech'
 import { DEFAULT_SCRIPT } from './lib/script'
 
@@ -27,10 +28,11 @@ const LIVE_SEED = [
 const EMPTY_SCRIPT = { title: '', topic: '', utterances: [{ text: '', note: '' }] }
 
 export default function App() {
-  const [view, setView] = useState('intro')   // intro | manage | editor | lecture
+  const [view, setView] = useState('intro')   // intro | manage | editor | logs | lecture
   const [script, setScript] = useState(DEFAULT_SCRIPT)
   const [lectureId, setLectureId] = useState(null)
   const [sessionId, setSessionId] = useState(null)
+  const [logTarget, setLogTarget] = useState(null)   // {id, title}
   const [mode, setMode] = useState('script')
   const [payload, setPayload] = useState(null)
   const [history, setHistory] = useState([])
@@ -42,7 +44,7 @@ export default function App() {
   const [matchInfo, setMatchInfo] = useState(null)
   const [liveMode, setLiveMode] = useState(false)
   const [noteIdx, setNoteIdx] = useState(-1)   // 현재 발화의 대본 위치
-    const [logTarget, setLogTarget] = useState(null)   // {id, title}
+  const [seqOf] = useState(() => new Map())    // 대본 seq → history 인덱스
 
   const started = view === 'lecture'
 
@@ -71,6 +73,17 @@ export default function App() {
     if (liveMode && !opts.exact) {
       await addPoint(utterance)
       return
+    }
+
+    // "아까 유사도 화면으로 돌아가볼게요" — 방향키 대신 말로 되돌아간다.
+    if (!opts.exact && isRecall(utterance)) {
+      const i = findRecallTarget(utterance, history)
+      if (i >= 0) {
+        setCursor(i)
+        setPayload(history[i])
+        setLog(`되돌아감 · ${history[i].component} (${i + 1}번째 화면)`)
+        return
+      }
     }
 
     setLoading(true)
@@ -104,16 +117,45 @@ export default function App() {
       setMatchInfo(null)
     }
 
+    // 한 번 만든 화면은 다시 만들지 않는다.
+    // 한 화면을 설명하는 동안 관련 단어를 여러 번 말하게 되는데,
+    // 그때마다 예시가 바뀌면 강의가 진행되지 않는다.
+    if (!opts.exact && mode === 'script' && idx >= 0) {
+      if (idx === noteIdx) {
+        setLog(`같은 대본 (${idx + 1}번) · 화면 유지`)
+        setLoading(false)
+        return
+      }
+      const seen = seqOf.get(idx)
+      if (seen != null && history[seen]) {
+        setCursor(seen)
+        setPayload(history[seen])
+        setNoteIdx(idx)
+        setLog(`이전 화면 (${idx + 1}번)`)
+        setLoading(false)
+        return
+      }
+    }
+
     setNoteIdx(idx)
 
     try {
       const res = await generate(target)
 
       if (res.ok) {
+        // 자유 모드: 컴포넌트가 같으면 화면을 유지한다
+        if (!opts.exact && mode === 'free' &&
+            payload && res.payload.component === payload.component) {
+          setLog(`${res.payload.component} · 같은 자료라 화면 유지`)
+          setLoading(false)
+          return
+        }
+
         setPayload(res.payload)
         setHistory((h) => {
           const next = [...h, res.payload]
           setCursor(next.length - 1)
+          if (idx >= 0) seqOf.set(idx, next.length - 1)
           return next
         })
         const name = res.payload.component
@@ -156,7 +198,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [mode, texts, liveMode, addPoint, sessionId])
+  }, [mode, texts, liveMode, addPoint, sessionId, history, payload, noteIdx, seqOf])
 
   // 청중 참여 구간 시작. PCA 축을 서버에 고정하고 Live 산점도로 전환한다.
   const startLive = useCallback(async () => {
@@ -229,7 +271,8 @@ export default function App() {
     setLiveMode(false)
     setSessionId(null)
     setNoteIdx(-1)
-  }, [stop])
+    seqOf.clear()
+  }, [stop, seqOf])
 
   // 방향키 수동 조작. 자동 생성이 실패해도 강의는 계속되어야 한다.
   useEffect(() => {
@@ -278,8 +321,9 @@ export default function App() {
     }
   }, [started])
 
-
-      if (view === 'logs' && logTarget) {
+  // 훅은 전부 위에서 선언한다. 조건부 return 아래에 훅이 오면 렌더마다
+  // 훅 개수가 달라져서 React가 에러를 낸다.
+  if (view === 'logs' && logTarget) {
     return (
       <LogReview
         lectureId={logTarget.id}

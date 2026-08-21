@@ -181,3 +181,34 @@ def cosine_angle(a: str, b: str) -> dict:
         "score": round(score, 4),
         "angle": round(deg, 1),
     }
+
+def compute_flow(a: str, b: str, dims: int = 6) -> dict:
+    """유사도 계산 과정을 펼쳐서 보여준다.
+    정규화된 벡터라 코사인 유사도가 곧 내적이다.
+    768개를 다 보여줄 수 없으므로 기여도가 큰 차원을 골라 보여준다.
+    앞에서부터 자르면 대부분 0에 가까워 화면에 아무것도 안 보인다."""
+    v = encode([a, b])
+    va, vb = v[0], v[1]
+
+    prod = va * vb
+    total = float(prod.sum())
+
+    n = min(dims, len(prod))
+    top = np.argsort(-np.abs(prod))[:n]
+    top = np.sort(top)   # 차원 번호 순으로 정렬해 보기 좋게
+
+    shown = float(prod[top].sum())
+
+    return {
+        "a": a,
+        "b": b,
+        "dims": n,
+        "total_dims": int(len(va)),
+        "indices": [int(i) for i in top],
+        "va": [round(float(va[i]), 3) for i in top],
+        "vb": [round(float(vb[i]), 3) for i in top],
+        "products": [round(float(prod[i]), 4) for i in top],
+        "shown_sum": round(shown, 4),
+        "rest_sum": round(total - shown, 4),
+        "score": round(total, 4),
+    }

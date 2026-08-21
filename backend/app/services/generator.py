@@ -85,7 +85,10 @@ def enrich(payload: dict) -> dict:
         payload["data"] = [
             embedder.cosine_angle(p[0], p[1]) for p in payload["pairs"]
         ]
-
+    elif name == "ComputeFlow":
+        payload["data"] = embedder.compute_flow(
+            payload["pair"][0], payload["pair"][1], payload.get("dims", 6)
+        )
     return payload
 
 

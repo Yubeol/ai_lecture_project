@@ -157,6 +157,23 @@ class Compare(Base):
                 raise ValueError(f"항목 길이 이상({len(s)}자): {s!r}")
         return v
 
+class ComputeFlow(Base):
+    """유사도가 계산되는 과정을 단계별로 보여준다.
+    숫자를 지어내지 않는다는 것을 시각적으로 증명하는 컴포넌트."""
+    component: Literal["ComputeFlow"]
+    title: str = Field(min_length=1, max_length=40)
+    pair: List[str] = Field(min_length=2, max_length=2)
+    dims: int = Field(default=6, ge=4, le=8)
+    caption: str = Field(default="", max_length=120)
+
+    @field_validator("pair")
+    @classmethod
+    def v_pair(cls, v):
+        a, b = _check_sentence(v[0]), _check_sentence(v[1])
+        if a == b:
+            raise ValueError("동일한 문장 쌍")
+        return v
+
 class NoOp(Base):
     """생성할 게 없을 때. 잡담/오인식 방어용."""
     component: Literal["none"]
@@ -173,6 +190,7 @@ REGISTRY = {
     "CosineAngle": CosineAngle,
     "Pipeline": Pipeline,
     "Compare": Compare,
+    "ComputeFlow": ComputeFlow,
 }
 
 def validate_payload(obj) -> tuple[bool, str, str | None]:

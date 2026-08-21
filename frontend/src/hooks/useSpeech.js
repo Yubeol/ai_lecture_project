@@ -16,7 +16,9 @@ export default function useSpeech({ onFinal, cooldownMs = 3000 }) {
   const lastFireRef = useRef(0)      // 마지막 발화 처리 시각 (쿨다운)
   const onFinalRef = useRef(onFinal)
 
-  useEffect(() => { onFinalRef.current = onFinal }, [onFinal])
+  useEffect(() => {
+    onFinalRef.current = onFinal
+  }, [onFinal])
 
   useEffect(() => {
     if (!SR) {
@@ -64,15 +66,33 @@ export default function useSpeech({ onFinal, cooldownMs = 3000 }) {
     r.onend = () => {
       setListening(false)
       setInterim('')
-      // 사용자가 끈 게 아니면 즉시 재시작
+      // 사용자가 끈 게 아니면 재시작. 즉시 호출하면 거부당할 수 있어 한 박자 쉰다.
       if (wantRef.current) {
-        try { r.start() } catch { /* 이미 시작된 경우 무시 */ }
+        setTimeout(() => {
+          if (wantRef.current) {
+            try { r.start() } catch { /* 이미 시작된 경우 무시 */ }
+          }
+        }, 300)
       }
     }
 
+    // Alt+Tab 등으로 탭이 백그라운드에 갔다 오면 인식이 끊긴 채로 남는다.
+    // 다시 보이는 순간 재시작한다.
+    function onVisible() {
+      if (document.visibilityState === 'visible' && wantRef.current) {
+        try { r.start() } catch { /* 이미 살아있으면 무시 */ }
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+
     recogRef.current = r
+
     return () => {
       wantRef.current = false
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
       try { r.stop() } catch { /* noop */ }
     }
   }, [cooldownMs])
