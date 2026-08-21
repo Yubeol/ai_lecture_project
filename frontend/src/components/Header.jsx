@@ -10,6 +10,7 @@ const LABELS = {
     Pipeline: '처리 과정',
     Compare: '비교',
     ComputeFlow: '계산 과정',
+    CosineFormula: '공식',
 }
 
 export default function Header({

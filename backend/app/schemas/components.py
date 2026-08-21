@@ -174,6 +174,21 @@ class ComputeFlow(Base):
             raise ValueError("동일한 문장 쌍")
         return v
 
+class CosineFormula(Base):
+    """코사인 유사도 공식에 실제 값을 대입해 보여준다."""
+    component: Literal["CosineFormula"]
+    title: str = Field(min_length=1, max_length=40)
+    pair: List[str] = Field(min_length=2, max_length=2)
+    caption: str = Field(default="", max_length=120)
+
+    @field_validator("pair")
+    @classmethod
+    def v_pair(cls, v):
+        a, b = _check_sentence(v[0]), _check_sentence(v[1])
+        if a == b:
+            raise ValueError("동일한 문장 쌍")
+        return v
+
 class NoOp(Base):
     """생성할 게 없을 때. 잡담/오인식 방어용."""
     component: Literal["none"]
@@ -191,6 +206,7 @@ REGISTRY = {
     "Pipeline": Pipeline,
     "Compare": Compare,
     "ComputeFlow": ComputeFlow,
+    "CosineFormula": CosineFormula,
 }
 
 def validate_payload(obj) -> tuple[bool, str, str | None]:

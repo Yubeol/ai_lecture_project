@@ -89,6 +89,10 @@ def enrich(payload: dict) -> dict:
         payload["data"] = embedder.compute_flow(
             payload["pair"][0], payload["pair"][1], payload.get("dims", 6)
         )
+    elif name == "CosineFormula":
+        payload["data"] = embedder.cosine_formula(
+            payload["pair"][0], payload["pair"][1]
+        )
     return payload
 
 

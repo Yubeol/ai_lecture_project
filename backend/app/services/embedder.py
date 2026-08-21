@@ -212,3 +212,25 @@ def compute_flow(a: str, b: str, dims: int = 6) -> dict:
         "rest_sum": round(total - shown, 4),
         "score": round(total, 4),
     }
+
+def cosine_formula(a: str, b: str) -> dict:
+    """코사인 공식에 실제 값을 채운다.
+    정규화된 벡터라 분모가 1이 되고, 그래서 내적이 곧 코사인이 된다.
+    이 사실을 눈으로 확인시키는 것이 목적이다."""
+    v = encode([a, b])
+    va, vb = v[0], v[1]
+
+    dot = float(np.dot(va, vb))
+    norm_a = float(np.linalg.norm(va))
+    norm_b = float(np.linalg.norm(vb))
+    deg = float(np.degrees(np.arccos(max(-1.0, min(1.0, dot)))))
+
+    return {
+        "a": a,
+        "b": b,
+        "dot": round(dot, 4),
+        "norm_a": round(norm_a, 4),
+        "norm_b": round(norm_b, 4),
+        "score": round(dot / (norm_a * norm_b), 4),
+        "angle": round(deg, 1),
+    }
